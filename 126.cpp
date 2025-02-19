@@ -6,80 +6,76 @@ class Solution {
     if (!wordSet.contains(endWord))
       return {};
 
-    // {"hit": ["hot"], "hot": ["dot", "lot"], ...}
-    unordered_map<string, vector<string>> graph;
-
-    // Build the graph from the beginWord to the endWord.
-    if (!bfs(beginWord, endWord, wordSet, graph))
+    unordered_map<string, int> distFromBeginWord{{beginWord, 0}};
+    if (!bfs(beginWord, endWord, wordSet, distFromBeginWord))
       return {};
 
     vector<vector<string>> ans;
-    dfs(graph, beginWord, endWord, {beginWord}, ans);
+    wordSet.insert(beginWord);
+    dfs(endWord, beginWord, distFromBeginWord, wordSet, {endWord}, ans);
     return ans;
   }
 
  private:
+  // Uses BFS to update the minimum steps to reach `endWord` from `beginWord` by
+  // using the words in `wordSet`.
   bool bfs(const string& beginWord, const string& endWord,
            unordered_set<string>& wordSet,
-           unordered_map<string, vector<string>>& graph) {
-    unordered_set<string> currentLevelWords{beginWord};
-
-    while (!currentLevelWords.empty()) {
-      for (const string& word : currentLevelWords)
-        wordSet.erase(word);
-      unordered_set<string> nextLevelWords;
-      bool reachEndWord = false;
-      for (const string& parent : currentLevelWords) {
-        vector<string> children;
-        getChildren(parent, wordSet, children);
-        for (const string& child : children) {
-          if (wordSet.contains(child)) {
-            nextLevelWords.insert(child);
-            graph[parent].push_back(child);
-          }
-          if (child == endWord)
-            reachEndWord = true;
+           unordered_map<string, int>& distFromBeginWord) {
+    queue<string> q{{beginWord}};
+    while (!q.empty()) {
+      for (int sz = q.size(); sz > 0; --sz) {
+        const string parent = q.front();
+        q.pop();
+        if (parent == endWord)
+          return true;
+        for (const string& child : getChildren(parent, wordSet)) {
+          if (distFromBeginWord.contains(child))
+            continue;
+          distFromBeginWord[child] = distFromBeginWord[parent] + 1;
+          q.push(child);
         }
       }
-      if (reachEndWord)
-        return true;
-      currentLevelWords = std::move(nextLevelWords);
     }
-
     return false;
   }
 
-  void getChildren(const string& parent, const unordered_set<string>& wordSet,
-                   vector<string>& children) {
-    string s(parent);
+  void dfs(const string& word, const string& beginWord,
+           const unordered_map<string, int>& distFromBeginWord,
+           const unordered_set<string>& wordSet, vector<string>&& path,
+           vector<vector<string>>& ans) {
+    if (word == beginWord) {
+      ans.push_back({path.rbegin(), path.rend()});
+      return;
+    }
 
-    for (int i = 0; i < s.length(); ++i) {
-      const char cache = s[i];
-      for (char c = 'a'; c <= 'z'; ++c) {
-        if (c == cache)
-          continue;
-        s[i] = c;
-        if (wordSet.contains(s))
-          children.push_back(s);
+    const int currDist = distFromBeginWord.at(word);
+
+    for (const string& child : getChildren(word, wordSet)) {
+      if (const auto it = distFromBeginWord.find(child);
+          it != distFromBeginWord.cend() && it->second == currDist - 1) {
+        path.push_back(child);
+        dfs(child, beginWord, distFromBeginWord, wordSet, std::move(path), ans);
+        path.pop_back();
       }
-      s[i] = cache;
     }
   }
 
-  void dfs(const unordered_map<string, vector<string>>& graph,
-           const string& word, const string& endWord, vector<string>&& path,
-           vector<vector<string>>& ans) {
-    if (word == endWord) {
-      ans.push_back(path);
-      return;
+  vector<string> getChildren(const string& parent,
+                             const unordered_set<string>& wordSet) {
+    vector<string> children;
+    string child(parent);
+    for (int i = 0; i < child.length(); ++i) {
+      const char cache = child[i];
+      for (char c = 'a'; c <= 'z'; ++c) {
+        if (c == cache)
+          continue;
+        child[i] = c;
+        if (wordSet.contains(child))
+          children.push_back(child);
+      }
+      child[i] = cache;
     }
-    if (!graph.contains(word))
-      return;
-
-    for (const string& child : graph.at(word)) {
-      path.push_back(child);
-      dfs(graph, child, endWord, std::move(path), ans);
-      path.pop_back();
-    }
+    return children;
   }
 };
